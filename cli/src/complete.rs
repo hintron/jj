@@ -625,15 +625,10 @@ pub fn branch_name_equals_any_revision(current: &std::ffi::OsStr) -> Vec<Complet
             bookmarks()
                 .into_iter()
                 .filter(|bookmark| {
-                    let Some(bookmark) = bookmark.get_value().to_str() else {
-                        return false;
-                    };
-                    bookmark.starts_with(current)
-
-                    // match bookmark.get_value().to_str() {
-                    //     Some(bookmark) => bookmark.starts_with(current),
-                    //     None => false,
-                    // }
+                    match bookmark.get_value().to_str() {
+                        Some(bookmark) => bookmark.starts_with(current),
+                        None => false,
+                    }
                 })
                 .collect()
         }
