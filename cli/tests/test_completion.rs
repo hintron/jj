@@ -299,6 +299,144 @@ fn test_bookmark_names() {
 }
 
 #[test]
+fn test_bookmark_create() {
+    let test_env = TestEnvironment::default();
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+
+    test_env.run_jj_in(".", ["git", "init", "origin"]).success();
+    let origin_dir = test_env.work_dir("origin");
+    let origin_git_repo_path = origin_dir
+        .root()
+        .join(".jj")
+        .join("repo")
+        .join("store")
+        .join("git");
+
+    work_dir
+        .run_jj([
+            "git",
+            "remote",
+            "add",
+            "origin",
+            origin_git_repo_path.to_str().unwrap(),
+        ])
+        .success();
+
+    origin_dir.run_jj(["desc", "-m", "test_desc"]).success();
+    work_dir.run_jj(["desc", "-m", "test_desc"]).success();
+
+    origin_dir
+        .run_jj(["bookmark", "create", "-r@", "myuser-push-untracked"])
+        .success();
+    origin_dir
+        .run_jj(["bookmark", "create", "-r@", "other-untracked"])
+        .success();
+    work_dir
+        .run_jj(["git", "push", "--named", "myuser-push-tracked=@"])
+        .success();
+    work_dir
+        .run_jj(["git", "push", "--named", "other-tracked=@"])
+        .success();
+    work_dir
+        .run_jj(["bookmark", "create", "-r@", "myuser-push-local"])
+        .success();
+    work_dir
+        .run_jj(["bookmark", "create", "-r@", "other-local"])
+        .success();
+
+    origin_dir.run_jj(["git", "export"]).success();
+    work_dir.run_jj(["git", "fetch"]).success();
+
+    let cmd = "config set --repo git.push-bookmark-prefix myuser-push-";
+    work_dir.run_jj(cmd.split_whitespace()).success();
+
+    // Test push-bookmark-prefix-complete
+
+    // Filter out all bookmarks without the prefix
+    let cmd = "config set --repo git.push-bookmark-prefix-complete all";
+    work_dir.run_jj(cmd.split_whitespace()).success();
+    let output = work_dir
+        .complete_fish(["bookmark", "create", ""])
+        .to_string()
+        // strip off all -- entries, since they are not interesting
+        .lines()
+        .filter(|line| !line.starts_with("--"))
+        .join("\n");
+    insta::assert_snapshot!(output, @r"
+    myuser-push-local	test_desc
+    myuser-push-tracked	test_desc
+    myuser-push-untracked
+    [EOF]
+    ");
+    // Filter out all remote bookmarks without the prefix
+    let cmd = "config set --repo git.push-bookmark-prefix-complete remote";
+    work_dir.run_jj(cmd.split_whitespace()).success();
+    let output = work_dir
+        .complete_fish(["bookmark", "create", ""])
+        .to_string()
+        // strip off all -- entries, since they are not interesting
+        .lines()
+        .filter(|line| !line.starts_with("--"))
+        .join("\n");
+    insta::assert_snapshot!(output, @r"
+    myuser-push-tracked	test_desc
+    myuser-push-untracked
+    [EOF]
+    ");
+    // Filter out all local bookmarks without the prefix
+    let cmd = "config set --repo git.push-bookmark-prefix-complete local";
+    work_dir.run_jj(cmd.split_whitespace()).success();
+    let output = work_dir
+        .complete_fish(["bookmark", "create", ""])
+        .to_string()
+        // strip off all -- entries, since they are not interesting
+        .lines()
+        .filter(|line| !line.starts_with("--"))
+        .join("\n");
+    insta::assert_snapshot!(output, @r"
+    myuser-push-local	test_desc
+    myuser-push-tracked	test_desc
+    [EOF]
+    ");
+    // Test that filters explicitly turned off has same output as being unset
+    let cmd = "config set --repo git.push-bookmark-prefix-complete none";
+    work_dir.run_jj(cmd.split_whitespace()).success();
+    let output = work_dir
+        .complete_fish(["bookmark", "create", ""])
+        .to_string()
+        .lines()
+        .filter(|line| !line.starts_with("--"))
+        .join("\n");
+    insta::assert_snapshot!(output,  @r"
+    myuser-push-local	test_desc
+    myuser-push-tracked	test_desc
+    myuser-push-untracked
+    other-local	test_desc
+    other-tracked	test_desc
+    other-untracked
+    [EOF]
+    ");
+    let cmd = "config set --repo git.push-bookmark-prefix-complete ''";
+    work_dir.run_jj(cmd.split_whitespace()).success();
+    let output = work_dir
+        .complete_fish(["bookmark", "create", ""])
+        .to_string()
+        .lines()
+        .filter(|line| !line.starts_with("--"))
+        .join("\n");
+    insta::assert_snapshot!(output,  @r"
+    myuser-push-local	test_desc
+    myuser-push-tracked	test_desc
+    myuser-push-untracked
+    other-local	test_desc
+    other-tracked	test_desc
+    other-untracked
+    [EOF]
+    ");
+}
+
+#[test]
 fn test_global_arg_repository_is_respected() {
     let test_env = TestEnvironment::default();
     test_env.run_jj_in(".", ["git", "init", "repo"]).success();

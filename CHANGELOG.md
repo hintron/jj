@@ -12,6 +12,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * `jj bookmark create` now tab completes on existing bookmarks.
 * `jj git push --named` now tab completes on existing bookmarks.
+* Add the `push-bookmark-prefix-completion` config option.
 
 ### Breaking changes
 
