@@ -624,11 +624,9 @@ pub fn branch_name_equals_any_revision(current: &std::ffi::OsStr) -> Vec<Complet
             // Look for existing bookmark names to match on tab complete
             bookmarks()
                 .into_iter()
-                .filter(|bookmark| {
-                    match bookmark.get_value().to_str() {
-                        Some(bookmark) => bookmark.starts_with(current),
-                        None => false,
-                    }
+                .filter(|bookmark| match bookmark.get_value().to_str() {
+                    Some(bookmark) => bookmark.starts_with(current),
+                    None => false,
                 })
                 .collect()
         }
