@@ -53,6 +53,19 @@ pub type ConfigTableLike<'a> = dyn toml_edit::TableLike + 'a;
 /// Generic config value.
 pub type ConfigValue = toml_edit::Value;
 
+use std::fs::OpenOptions;
+use std::io::Write;
+
+fn log_debug(msg: &str) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/jj-complete-debug2.log")
+    {
+        let _ = writeln!(file, "{}", msg);
+    }
+}
+
 /// Error that can occur when parsing or loading config variables.
 #[derive(Debug, Error)]
 pub enum ConfigLoadError {
@@ -424,6 +437,10 @@ impl ConfigLayer {
         let would_overwrite_table = |name| ConfigUpdateError::WouldOverwriteValue { name };
         let name = name.into_name_path();
         let name = name.borrow();
+        let name_str = name.to_string();
+        if name_str.starts_with("git.push-bookmark") {
+            log_debug(&format!("set_value({name_str}): Got here"));
+        }
         let (leaf_key, table_keys) = name
             .0
             .split_last()

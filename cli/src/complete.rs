@@ -181,20 +181,11 @@ pub fn bookmarks() -> Vec<CompletionCandidate> {
         log_debug(&format!("Push Prefix: {prefix:?}"));
 
         // Optionally filter out any bookmarks that don't start with the push prefix.
-        #[derive(Debug)]
-        enum PrefixTabComplete {
-            All,
-            Local,
-            Remote,
-            None,
-        }
-        let prefix_comp = match settings.get_string("git.push-bookmark-prefix-completion") {
-            Ok(prefix) if prefix == "all" => PrefixTabComplete::All,
-            Ok(prefix) if prefix == "local" => PrefixTabComplete::Local,
-            Ok(prefix) if prefix == "remote" => PrefixTabComplete::Remote,
-            _ => PrefixTabComplete::None,
+        let prefix_comp = match settings.get_bool("git.push-bookmark-prefix-completion").ok() {
+            Some(x) => x,
+            None => false,
         };
-        log_debug(&format!("prefix_comp: {prefix_comp:?}"));
+        log_debug(&format!("prefix_comp: {prefix_comp}"));
 
         Ok((&stdout
             .lines()
@@ -211,26 +202,11 @@ pub fn bookmarks() -> Vec<CompletionCandidate> {
                 log_debug(&format!("  local: {local}"));
                 log_debug(&format!("  mine: {mine}"));
 
-                match prefix_comp {
-                    PrefixTabComplete::All => {
-                        if !mine {
-                            log_debug("  Returning None from All");
-                            return None;
-                        }
+                if prefix_comp {
+                    if !mine {
+                        log_debug("  Discarding bookmark because it is not mine");
+                        return None;
                     }
-                    PrefixTabComplete::Local => {
-                        if !local || !mine {
-                            log_debug("  Returning None from Local");
-                            return None;
-                        }
-                    }
-                    PrefixTabComplete::Remote => {
-                        if local || !mine {
-                            log_debug("  Returning None from Remote");
-                            return None;
-                        }
-                    }
-                    PrefixTabComplete::None => log_debug("  Case None"),
                 }
                 log_debug("  Fall through");
 
