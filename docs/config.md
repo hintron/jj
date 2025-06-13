@@ -1502,6 +1502,16 @@ example:
 push-bookmark-prefix = "martinvonz/push-"
 ```
 
+When creating bookmarks, you can also limit tab-completed bookmarks to only tab
+comple bookmarks that start with the push bookmark prefix.
+Possible options are `local`, `remote`, `all`, or `none` (default).
+
+```toml
+[git]
+push-bookmark-prefix-complete = "remote"
+```
+
+
 ### Set of private commits
 
 You can configure the set of private commits by setting `git.private-commits` to

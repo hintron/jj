@@ -430,6 +430,11 @@
                     "description": "Prefix used when pushing a bookmark based on a change ID",
                     "default": "push-"
                 },
+                "push-bookmark-prefix-complete": {
+                    "type": "string",
+                    "description": "If set to 'remote', 'local', or 'all', jj will filter out remote bookmarks, local bookmarks, or all bookmarks, respectively, that don't start with the push-bookmark-prefix.",
+                    "default": "none"
+                },
                 "push-new-bookmarks": {
                     "type": "boolean",
                     "description": "Allow pushing new bookmarks without --allow-new",

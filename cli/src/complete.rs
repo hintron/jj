@@ -138,7 +138,27 @@ pub fn untracked_bookmarks() -> Vec<CompletionCandidate> {
     })
 }
 
+use std::fs::OpenOptions;
+use std::io::Write;
+
+fn log_debug(msg: &str) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/jj-complete-debug.log")
+    {
+        let _ = writeln!(file, "{}", msg);
+    }
+}
+
 pub fn bookmarks() -> Vec<CompletionCandidate> {
+    // Clear the debug file at the start
+    std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open("/tmp/jj-complete-debug.log")
+        .ok();
+
     with_jj(|jj, settings| {
         let output = jj
             .build()
@@ -158,16 +178,61 @@ pub fn bookmarks() -> Vec<CompletionCandidate> {
 
         let prefix = settings.get_string("git.push-bookmark-prefix").ok();
 
+        log_debug(&format!("Push Prefix: {prefix:?}"));
+
+        // Optionally filter out any bookmarks that don't start with the push prefix.
+        #[derive(Debug)]
+        enum PrefixTabComplete {
+            All,
+            Local,
+            Remote,
+            None,
+        }
+        let prefix_comp = match settings.get_string("git.push-bookmark-prefix-completion") {
+            Ok(prefix) if prefix == "all" => PrefixTabComplete::All,
+            Ok(prefix) if prefix == "local" => PrefixTabComplete::Local,
+            Ok(prefix) if prefix == "remote" => PrefixTabComplete::Remote,
+            _ => PrefixTabComplete::None,
+        };
+        log_debug(&format!("prefix_comp: {prefix_comp:?}"));
+
         Ok((&stdout
             .lines()
             .map(split_help_text)
             .chunk_by(|(name, _)| name.split_once('@').map(|t| t.0).unwrap_or(name)))
             .into_iter()
-            .map(|(bookmark, mut refs)| {
+            .filter_map(|(bookmark, mut refs)| {
+                log_debug(&format!("Bookmark: {bookmark}"));
                 let help = refs.find_map(|(_, help)| help);
 
                 let local = help.is_some();
                 let mine = prefix.as_ref().is_some_and(|p| bookmark.starts_with(p));
+
+                log_debug(&format!("  local: {local}"));
+                log_debug(&format!("  mine: {mine}"));
+
+                match prefix_comp {
+                    PrefixTabComplete::All => {
+                        if !mine {
+                            log_debug("  Returning None from All");
+                            return None;
+                        }
+                    }
+                    PrefixTabComplete::Local => {
+                        if !local || !mine {
+                            log_debug("  Returning None from Local");
+                            return None;
+                        }
+                    }
+                    PrefixTabComplete::Remote => {
+                        if local || !mine {
+                            log_debug("  Returning None from Remote");
+                            return None;
+                        }
+                    }
+                    PrefixTabComplete::None => log_debug("  Case None"),
+                }
+                log_debug("  Fall through");
 
                 let display_order = match (local, mine) {
                     (true, true) => 0,
@@ -175,9 +240,11 @@ pub fn bookmarks() -> Vec<CompletionCandidate> {
                     (false, true) => 2,
                     (false, false) => 3,
                 };
-                CompletionCandidate::new(bookmark)
-                    .help(help)
-                    .display_order(Some(display_order))
+                Some(
+                    CompletionCandidate::new(bookmark)
+                        .help(help)
+                        .display_order(Some(display_order)),
+                )
             })
             .collect())
     })
